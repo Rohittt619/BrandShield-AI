@@ -1,0 +1,13 @@
+﻿[project]
+name = "brandshield-ai"
+version = "0.1.0"
+description = "AI-powered fake logo detection and brand authenticity verification."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Rohit Rathod" }]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100

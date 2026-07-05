@@ -6,6 +6,13 @@ BrandShield-AI is a professional upgrade of the original graduation project, Fak
 
 The original project combined YOLOv5 logo localization, CNN-based Real/Fake classification, webcam inference, sound alerts, and basic brand mapping. During migration, the available dataset was verified and found to contain Real/Fake image folders, but no YOLO bounding-box annotation files. Because of that, BrandShield-AI is structured in phases:
 
+**Findings during migration:**
+* The old project folder contained a copied YOLOv5 repository plus generated/runtime files, and several key files (`data.yaml`, `label_names.txt`, `detect_and_classify.py`) had accidentally been saved as folders instead of files.
+* The dataset has Real/Fake image splits: 439 Fake train, 220 Real train, 110 Fake val, 55 Real val.
+* The `labels` folders contained `.jpg` images, not YOLO `.txt` annotation files — meaning the dataset supports classification but not detector training as-is.
+
+This is why the upgrade was split into phases rather than porting the old two-stage pipeline directly:
+
 * **Phase 1:** Train and deploy a strong Real/Fake logo classifier using the existing dataset.
 * **Phase 2:** Add YOLO-based logo detection after proper bounding-box labels or a real detection dataset are available.
 * **Phase 3:** Add Grad-CAM explainability, PDF reports, Streamlit UI, and API deployment.

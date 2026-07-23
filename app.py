@@ -26,15 +26,91 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def render_analysis_results(results: dict, image: Image.Image, target_brand: str):
+    st.divider()
+    
+    # Metrics Row
+    m1, m2, m3, m4, m5 = st.columns(5)
+    
+    score = results["authenticity_score"]
+    verdict = results["verdict_label"]
+    threat = results["threat_level"]
+    
+    with m1:
+        st.metric("Authenticity Score", f"{score}%")
+        st.progress(int(min(score, 100)))
+        
+    with m2:
+        st.metric("Verdict", verdict)
+        
+    with m3:
+        st.metric("Threat Level", threat)
+        
+    with m4:
+        st.metric("Edge Density", f"{results['edge_density']}")
+        
+    with m5:
+        st.metric("ORB Keypoints", f"{results['keypoints_count']}")
+
+    st.divider()
+
+    # Visual Comparison Section
+    st.subheader("🔬 Visual Forensic Inspection Studio")
+    v1, v2, v3 = st.columns(3)
+    
+    with v1:
+        st.markdown("#### 1. Input Logo")
+        st.image(image, use_container_width=True)
+        
+    with v2:
+        st.markdown("#### 2. ORB Feature Keypoints")
+        st.image(results["keypoint_image"], use_container_width=True)
+        
+    with v3:
+        st.markdown("#### 3. Edge Heatmap Overlay")
+        st.image(results["heatmap_image"], use_container_width=True)
+
+    st.divider()
+
+    # Forensic Audit Findings Card
+    with st.expander("📋 Detailed Forensic Findings", expanded=True):
+        if results["is_authentic"]:
+            st.success(f"✅ **Verdict**: Logo matches official **{target_brand}** trademark specifications.")
+        else:
+            st.error(f"❌ **Verdict**: High probability of **COUNTERFEIT / ALTERED LOGO** for **{target_brand}**.")
+            
+        st.markdown("#### Key Forensic Observations:")
+        for reason in results["forensic_reasons"]:
+            st.markdown(f"- {reason}")
+
+    st.divider()
+
+    # Download Report PDF
+    pdf_bytes = ForensicReportGenerator.generate_pdf_bytes(results)
+    st.download_button(
+        "📥 Download Executive Forensic Verification Certificate (PDF)",
+        pdf_bytes,
+        file_name=f"BrandShield_Verification_{target_brand}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+
 def main():
     st.sidebar.title("🛡️ BrandShield-AI")
     st.sidebar.caption("Enterprise Counterfeit Logo & Brand Protection System")
     
     db = BrandShieldDB()
     detector = BrandShieldDetector()
+
+    # Gemini Status Indicator
+    if detector.gemini_available:
+        st.sidebar.success("🟢 Gemini 1.5 Vision API Active")
+    else:
+        st.sidebar.warning("🟡 Gemini API Key Missing (Using OpenCV Structural Mode)")
     
     nav = st.sidebar.radio("Navigation", [
-        "🛡️ Live Inspection Portal", 
+        "🛡️ File Upload Inspection", 
+        "📷 Live Webcam Scanner",
         "🌐 Web URL Scanner",
         "📊 SQLite Audit Logs & Analytics", 
         "🏗️ System Architecture"
@@ -79,23 +155,42 @@ def main():
         st.title("🏗️ BrandShield-AI Architecture & Multi-Stage Pipeline")
         st.markdown("""
         ### Multi-Stage Forensic Inspection Engine:
-        1. **Dual Ingestion Engine**: Accepts high-res local image uploads (PNG/JPG) OR live web product image URLs.
+        1. **Multi-Input Ingestion**: High-res File Upload, Live Camera Input, OR Web URL Ingestion.
         2. **OpenCV Structural Analysis**: Calculates Canny Edge Density, Contour Symmetries, and 500 ORB feature keypoint vectors.
-        3. **Deep Feature Extraction**: MobileNetV2 Deep Learning transfer heuristics.
-        4. **Google Gemini 1.5 Pro Multimodal Vision**: Inspects typography alignment, trademark gradient anomalies, and geometry.
-        5. **SQLite Persistence**: Stores all inspection alerts and brand threat trends in `database/brandshield.db`.
-        6. **ReportLab Forensic Certification**: Generates downloadable PDF verification certificates for legal compliance teams.
+        3. **Google Gemini 1.5 Pro Multimodal Vision**: Inspects logo typography, trademark symmetry, and checks for **Brand Mismatches** (e.g. Adidas logo submitted for Nike).
+        4. **SQLite Persistence**: Stores all inspection alerts and brand threat trends in `database/brandshield.db`.
+        5. **ReportLab Forensic Certification**: Generates downloadable PDF verification certificates.
         """)
         return
 
-    # 3. Main Live Inspection Portal (File Upload or Web URL)
+    # Header for Scanner Tabs
     st.title("🛡️ BrandShield-AI")
     st.subheader("AI-Powered Counterfeit Logo Detection & Forensic Verification")
     st.divider()
 
-    image_to_analyze = None
-    source_type = "File Upload"
+    # 3. Live Webcam Scanner Tab
+    if nav == "📷 Live Webcam Scanner":
+        st.markdown("### 📷 Live Webcam Logo Scanner")
+        camera_photo = st.camera_input("Take a photo of product logo using your camera")
+        target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="cam_brand")
+        
+        if camera_photo:
+            image = Image.open(camera_photo)
+            with st.spinner(f"Running forensic inspection on camera photo for {target_brand}..."):
+                results = detector.analyze_logo(image, target_brand)
+                db.save_inspection(
+                    brand=target_brand,
+                    verdict=results["verdict_label"],
+                    score=results["authenticity_score"],
+                    threat_level=results["threat_level"],
+                    edge_density=results["edge_density"],
+                    keypoints_count=results["keypoints_count"],
+                    source_type="Webcam Scan"
+                )
+                render_analysis_results(results, image, target_brand)
+        return
 
+    # 4. Web URL Scanner Tab
     if nav == "🌐 Web URL Scanner":
         st.markdown("### 🌐 Inspect Image from Web URL")
         url_input = st.text_input("Paste Live Image URL (e.g. e-commerce product image)", placeholder="https://example.com/logo.jpg")
@@ -108,31 +203,35 @@ def main():
                 return
             try:
                 with st.spinner("Fetching image from Web URL..."):
-                    image_to_analyze = detector.load_image_from_url(url_input)
-                    source_type = "Web URL Scan"
+                    image = detector.load_image_from_url(url_input)
+                    results = detector.analyze_logo(image, target_brand)
+                    db.save_inspection(
+                        brand=target_brand,
+                        verdict=results["verdict_label"],
+                        score=results["authenticity_score"],
+                        threat_level=results["threat_level"],
+                        edge_density=results["edge_density"],
+                        keypoints_count=results["keypoints_count"],
+                        source_type="Web URL Scan"
+                    )
+                    render_analysis_results(results, image, target_brand)
             except Exception as e:
                 st.error(f"Failed to fetch image from URL: {e}")
-                return
-    else:
-        left_col, right_col = st.columns([1, 2])
-        with left_col:
-            st.markdown("### 📤 Upload Logo File")
-            uploaded_file = st.file_uploader("Choose Logo Image (PNG / JPG / JPEG)", type=["png", "jpg", "jpeg"])
-            target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="file_brand")
-            analyze_btn = st.button("🔍 Run Forensic Inspection", use_container_width=True)
+        return
 
-            if analyze_btn:
-                if uploaded_file is None:
-                    st.error("Please upload a logo image to inspect.")
-                    return
-                image_to_analyze = Image.open(uploaded_file)
-                source_type = "File Upload"
+    # 5. File Upload Inspection Tab
+    st.markdown("### 📤 Upload Logo File")
+    uploaded_file = st.file_uploader("Choose Logo Image (PNG / JPG / JPEG)", type=["png", "jpg", "jpeg"])
+    target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="file_brand")
+    analyze_btn = st.button("🔍 Run Forensic Inspection", use_container_width=True)
 
-    if image_to_analyze:
+    if analyze_btn:
+        if uploaded_file is None:
+            st.error("Please upload a logo image to inspect.")
+            return
+        image = Image.open(uploaded_file)
         with st.spinner(f"Running OpenCV Structural Inspection & Querying Gemini Vision for {target_brand}..."):
-            results = detector.analyze_logo(image_to_analyze, target_brand)
-            
-            # Save to SQLite Database
+            results = detector.analyze_logo(image, target_brand)
             db.save_inspection(
                 brand=target_brand,
                 verdict=results["verdict_label"],
@@ -140,83 +239,9 @@ def main():
                 threat_level=results["threat_level"],
                 edge_density=results["edge_density"],
                 keypoints_count=results["keypoints_count"],
-                source_type=source_type
+                source_type="File Upload"
             )
-            
-            st.session_state["results"] = results
-            st.session_state["original_image"] = image_to_analyze
-
-    if st.session_state.get("results"):
-        results = st.session_state["results"]
-        orig_img = st.session_state["original_image"]
-        
-        st.divider()
-        
-        # Metrics Row
-        m1, m2, m3, m4, m5 = st.columns(5)
-        
-        score = results["authenticity_score"]
-        verdict = results["verdict_label"]
-        threat = results["threat_level"]
-        
-        with m1:
-            st.metric("Authenticity Score", f"{score}%")
-            st.progress(int(min(score, 100)))
-            
-        with m2:
-            st.metric("Verdict", verdict)
-            
-        with m3:
-            st.metric("Threat Level", threat)
-            
-        with m4:
-            st.metric("Edge Density", f"{results['edge_density']}")
-            
-        with m5:
-            st.metric("ORB Keypoints", f"{results['keypoints_count']}")
-
-        st.divider()
-
-        # Visual Comparison Section
-        st.subheader("🔬 Visual Forensic Inspection Studio")
-        v1, v2, v3 = st.columns(3)
-        
-        with v1:
-            st.markdown("#### 1. Input Logo")
-            st.image(orig_img, use_container_width=True)
-            
-        with v2:
-            st.markdown("#### 2. ORB Feature Keypoints")
-            st.image(results["keypoint_image"], use_container_width=True)
-            
-        with v3:
-            st.markdown("#### 3. Edge Heatmap Overlay")
-            st.image(results["heatmap_image"], use_container_width=True)
-
-        st.divider()
-
-        # Forensic Audit Findings Card
-        with st.expander("📋 Detailed Forensic Findings", expanded=True):
-            if results["is_authentic"]:
-                st.success(f"✅ **Verdict**: Logo matches official **{target_brand}** trademark specifications.")
-            else:
-                st.error(f"❌ **Verdict**: High probability of **COUNTERFEIT / ALTERED LOGO** for **{target_brand}**.")
-                
-            st.markdown("#### Key Forensic Observations:")
-            for reason in results["forensic_reasons"]:
-                st.markdown(f"- {reason}")
-
-        st.divider()
-
-        # Download Report PDF
-        pdf_bytes = ForensicReportGenerator.generate_pdf_bytes(results)
-        st.download_button(
-            "📥 Download Executive Forensic Verification Certificate (PDF)",
-            pdf_bytes,
-            file_name=f"BrandShield_Verification_{target_brand}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
+            render_analysis_results(results, image, target_brand)
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,7 @@ class BrandShieldDetector:
     ]
 
     def __init__(self):
-        # Configure Gemini API if key is present
+        # Safely check local environment variables or Streamlit secrets
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.gemini_available = False
         if api_key:
@@ -33,7 +33,7 @@ class BrandShieldDetector:
     @staticmethod
     def load_image_from_url(url: str) -> Image.Image:
         """
-        Fetches an image from a live Web URL (e.g. e-commerce product image).
+        Fetches an image from a live Web URL.
         """
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         res = requests.get(url, headers=headers, timeout=10)
@@ -42,7 +42,7 @@ class BrandShieldDetector:
 
     def analyze_logo(self, image_pil: Image.Image, target_brand: str = "Nike") -> dict:
         """
-        Runs complete multi-stage forensic analysis on uploaded logo image.
+        Runs multi-stage forensic analysis on uploaded or captured logo image.
         """
         img_np = np.array(image_pil.convert("RGB"))
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
@@ -69,17 +69,17 @@ class BrandShieldDetector:
         num_keypoints = len(keypoints) if keypoints is not None else 0
         
         # Base Score (0 - 100)
-        base_score = 88.5
+        base_score = 85.0
         if edge_density > 0.35 or edge_density < 0.02:
             base_score -= 25.0
-        if num_keypoints < 20:
+        if num_keypoints < 10:
             base_score -= 30.0
         elif num_keypoints > 350:
             base_score -= 15.0
             
         base_score = max(15.0, min(99.0, base_score))
         
-        # 3. Gemini 1.5 Pro Multimodal Vision Verification (if API key available)
+        # 3. Gemini 1.5 Pro Multimodal Vision Audit
         ai_verdict = None
         if self.gemini_available:
             ai_verdict = self._run_gemini_vision_audit(image_pil, target_brand)
@@ -96,7 +96,7 @@ class BrandShieldDetector:
             forensic_summary = [
                 f"Edge density ratio: {edge_density:.4f}",
                 f"ORB Keypoints extracted: {num_keypoints}",
-                "Structural symmetry & vector geometry alignment verified."
+                "Note: Configure GEMINI_API_KEY in Streamlit Secrets for brand mismatch detection."
             ]
 
         return {
@@ -114,29 +114,30 @@ class BrandShieldDetector:
 
     def _run_gemini_vision_audit(self, image_pil: Image.Image, target_brand: str) -> dict:
         try:
-            candidate_models = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "gemini-1.5-flash-latest"]
+            candidate_models = [
+                "models/gemini-1.5-flash",
+                "models/gemini-1.5-pro",
+                "gemini-1.5-flash-latest"
+            ]
             
             prompt = f"""
-You are a Brand Protection & Counterfeit Detection Forensic Specialist for top global brands.
-Inspect the uploaded logo image against authentic specifications for brand: "{target_brand}".
+You are a Brand Protection Forensic Specialist for global brands.
+Inspect the image against target brand: "{target_brand}".
 
-Check for counterfeit indicators:
-1. Font distortion or typography mismatches
-2. Vector geometry asymmetry or shape distortion
-3. Color gradient anomalies
-4. Unauthorized trademark modifications
+CRITICAL INSPECTION RULES:
+1. BRAND MISMATCH CHECK: Does the image show a logo for a DIFFERENT brand than "{target_brand}"? (e.g., an Adidas logo uploaded when target brand is set to Nike). If brand is mismatched, set verdict to "COUNTERFEIT", authenticity_score to 5.0, threat_level to "HIGH", and state "BRAND MISMATCH: Image shows a different logo than {target_brand}."
+2. TYPOGRAPHY & SYMMETRY: Check for font distortion, irregular stroke weights, or trademark alterations.
 
-Return JSON object with exact keys:
+Return JSON object:
 {{
-    "authenticity_score": 92.0,
+    "authenticity_score": 95.0,
     "verdict": "AUTHENTIC",
     "threat_level": "LOW",
     "forensic_reasons": [
-        "Typography matches official brand font guidelines",
-        "Vector symmetry aligns with authentic trademark specs"
+        "Brand match verified for {target_brand}",
+        "Typography matches authentic specifications"
     ]
 }}
-If counterfeit/fake: set verdict to "COUNTERFEIT", authenticity_score under 40.0, threat_level to "HIGH".
 """
             for m_name in candidate_models:
                 try:

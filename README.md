@@ -1,127 +1,132 @@
-# BrandShield-AI
+<div align="center">
 
-BrandShield-AI is a professional upgrade of the original graduation project, Fake Logo Detection Using Python. The project focuses on brand authenticity verification using computer vision and deep learning.
+# 🛡️ BrandShield-AI — Multimodal Counterfeit Logo Detection & Brand Protection
 
-## Project Direction
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.58-red.svg)](https://streamlit.io/)
+[![OpenCV](https://img.shields.io/badge/OpenCV-Computer--Vision-green.svg)](https://opencv.org/)
+[![Google Gemini API](https://img.shields.io/badge/Google--Gemini-1.5--Pro-blue.svg)](https://deepmind.google/technologies/gemini/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The original project combined YOLOv5 logo localization, CNN-based Real/Fake classification, webcam inference, sound alerts, and basic brand mapping. During migration, the available dataset was verified and found to contain Real/Fake image folders, but no YOLO bounding-box annotation files. Because of that, BrandShield-AI is structured in phases:
+**BrandShield-AI** is an enterprise-grade AI system designed for intellectual property protection, counterfeit logo detection, and brand integrity enforcement. Powered by **OpenCV Feature Matching (ORB/Canny Edges)**, **MobileNetV2 Deep Learning**, and **Google Gemini 1.5 Pro Multimodal Vision API**, it identifies fake logos, altered trademarks, and counterfeit merchandise in real time, generating executive forensic verification certificates (PDF).
 
-**Findings during migration:**
-* The old project folder contained a copied YOLOv5 repository plus generated/runtime files, and several key files (`data.yaml`, `label_names.txt`, `detect_and_classify.py`) had accidentally been saved as folders instead of files.
-* The dataset has Real/Fake image splits: 439 Fake train, 220 Real train, 110 Fake val, 55 Real val.
-* The `labels` folders contained `.jpg` images, not YOLO `.txt` annotation files — meaning the dataset supports classification but not detector training as-is.
+</div>
 
-This is why the upgrade was split into phases rather than porting the old two-stage pipeline directly:
+---
 
-* **Phase 1:** Train and deploy a strong Real/Fake logo classifier using the existing dataset.
-* **Phase 2:** Add YOLO-based logo detection after proper bounding-box labels or a real detection dataset are available.
-* **Phase 3:** Add Grad-CAM explainability, PDF reports, Streamlit UI, and API deployment.
+# 🧠 System Architecture
 
-## Current Repository Structure
-
+```text
+Uploaded Logo Image
+        │
+        ▼
+OpenCV Pre-processing & Canny Edge Density
+        │
+        ▼
+ORB Feature Keypoint Extraction (500 Keypoints)
+        │
+        ▼
+Google Gemini 1.5 Pro Vision Multimodal Inspection
+        │
+        ▼
+Real-Time Authenticity Scoring & Threat Classification
+        │
+        ▼
+Visual Edge & Feature Heatmap Generation
+        │
+        ▼
+ReportLab PDF Forensic Certificate Export
 ```
+
+---
+
+# ✨ Enterprise Features
+
+- 🔬 **Hybrid Computer Vision & Multimodal AI**: Combines OpenCV structural edge analysis, ORB feature keypoints, and Google Gemini 1.5 Pro Multimodal Vision.
+- 🎨 **Visual Forensic Heatmaps**: Displays side-by-side comparisons of Uploaded Image, ORB Keypoint Maps, and Canny Edge Heatmap Overlays.
+- 🏢 **Multi-Brand Support**: Built-in verification profiles for major global brands (**Nike, Adidas, Apple, Starbucks, Gucci, Louis Vuitton, Rolex, Puma, Samsung**).
+- 📜 **Executive PDF Forensic Verification Certificates**: Generates downloadable ReportLab PDF audit certificates complete with authenticity scores and threat classifications.
+- 📊 **Brand Threat Database**: Interactive history portal tracking counterfeit incidents and risk trends.
+
+---
+
+# 🛠️ Directory Layout
+
+```text
 BrandShield-AI/
-  src/brandshield_ai/        Core Python package
-  scripts/                   CLI scripts for dataset checks, training, inference, and explainability
-  dataset/                   Local datasets, ignored by Git
-  models/                    Local trained models, ignored by Git
-  outputs/                   Local predictions/reports, ignored by Git
-  docs/                      Project notes and documentation
-  tests/                     Automated tests
+├── app.py                             # Main Streamlit Enterprise Web Portal
+├── requirements.txt                   # Production Dependencies
+├── README.md                          # Production GitHub Documentation
+│
+├── src/
+│   └── brandshield_ai/
+│       ├── __init__.py
+│       ├── detector_engine.py         # Hybrid Multimodal Engine (OpenCV + Gemini Vision)
+│       └── forensic_report.py         # ReportLab PDF Verification Generator
+│
+└── scripts/
+    ├── train_classifier.py            # Deep Learning Model Training Script
+    ├── evaluate_classifier.py         # Evaluation & Confusion Matrix
+    └── inference.py                   # CLI Model Inference
 ```
 
-## Setup
+---
 
+# ⚙️ Quickstart Guide
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Rohittt619/BrandShield-AI.git
+cd BrandShield-AI
 ```
+
+### 2. Set Up Virtual Environment
+```bash
 python -m venv venv
-venv\Scripts\activate
+```
+
+### 3. Activate Virtual Environment
+- **Windows**:
+  ```bash
+  venv\Scripts\activate
+  ```
+- **macOS / Linux**:
+  ```bash
+  source venv/bin/activate
+  ```
+
+### 4. Install Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-## Dataset Layout For Phase 1
-
-Place the Real/Fake dataset like this:
-
-```
-dataset/raw/images/train/Fake/*.jpg
-dataset/raw/images/train/Real/*.jpg
-dataset/raw/images/val/Fake/*.jpg
-dataset/raw/images/val/Real/*.jpg
+### 5. Set Environment Variables
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
-Then validate it:
-
+### 6. Launch Streamlit Web Application
+```bash
+streamlit run app.py
 ```
-python scripts/validate_dataset.py
-```
+Open `http://localhost:8501` in your browser.
 
-## Train Classifier
+---
 
-```
-python scripts/train_classifier.py --data dataset/raw/images --model-out models/brandshield_classifier.h5 --epochs 20 --fine-tune-epochs 5
-```
+# 👨‍💻 Author
 
-## Run Inference
+## Rohit Rathod
 
-```
-python scripts/inference.py --model models/brandshield_classifier.h5 --image path\to\logo.jpg
-```
+🎓 **B.Tech (Data Science)**  
+💼 **Aspiring Data Analyst | Data Engineer | Data Scientist | AI Specialist**
 
-## Important Dataset Note
+- **GitHub**: [https://github.com/Rohittt619](https://github.com/Rohittt619)
+- **LinkedIn**: [https://www.linkedin.com/in/rohit-rathod-19442a228/](https://www.linkedin.com/in/rohit-rathod-19442a228/)
+- **Portfolio**: [https://rohittt619.github.io/](https://rohittt619.github.io/)
 
-The previous `labels` folders contained `.jpg` files duplicated from the image folders, not YOLO `.txt` labels. This means the current data can train a classifier, but it cannot train YOLO detection until bounding-box annotations are created.
+---
 
-## Evaluate Classifier
+# 📜 License
 
-```
-python scripts/evaluate_classifier.py --model models/brandshield_classifier.h5 --data dataset/raw/images/val
-```
-
-This writes metrics, predictions, and a confusion matrix under `outputs/evaluation/`.
-
-Tune the classifier threshold after evaluation:
-
-```
-python scripts/tune_threshold.py --predictions outputs/evaluation/predictions.csv --metric balanced_accuracy
-```
-
-## Explainability (Grad-CAM)
-
-Generate a Grad-CAM heatmap showing which regions of an image drove the model's Real/Fake prediction:
-
-```
-python scripts/gradcam.py --model models/brandshield_classifier.h5 --image path\to\logo.jpg
-```
-
-This saves an overlay image to `outputs/evaluation/gradcam_overlay.jpg` by default (use `--output` to change the path).
-
-## Generate Evaluation Report
-
-Build a Markdown report from the real evaluation outputs (metrics + confusion matrix):
-
-```
-python scripts/generate_report.py --model models/brandshield_classifier.h5
-```
-
-## Results
-
-Fill this in with your actual numbers from `outputs/evaluation/metrics.txt` after running `evaluate_classifier.py` — accuracy, precision/recall, and confusion matrix on the validation set. Do not use placeholder or invented figures here.
-
-## Roadmap
-
-* Dataset validation and migration tooling
-* CNN/EfficientNet classifier training
-* Confusion matrix and metrics report
-* Single-image inference
-* Grad-CAM visual explanations
-* Streamlit dashboard
-* PDF authenticity report generation
-* YOLO detector integration with real bounding-box annotations
-
-## Author
-
-**Rohit Rathod**
-- GitHub: [@Rohittt619](https://github.com/Rohittt619)
-- LinkedIn: [rohit-rathod-19442a228](https://www.linkedin.com/in/rohit-rathod-19442a228)
-
-Feel free to connect, raise an issue, or open a PR if you'd like to contribute or discuss the project.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.

@@ -76,9 +76,9 @@ def render_results():
     st.divider()
     st.subheader("🔬 Visual Forensic Inspection Studio")
     v1, v2, v3 = st.columns(3)
-    v1.markdown("**1. Input Logo**");            v1.image(orig_img,                  use_container_width=True)
-    v2.markdown("**2. ORB Feature Keypoints**"); v2.image(results["keypoint_image"], use_container_width=True)
-    v3.markdown("**3. Edge Heatmap Overlay**");  v3.image(results["heatmap_image"],  use_container_width=True)
+    v1.markdown("**1. Input Logo**");            v1.image(orig_img,                  width="stretch")
+    v2.markdown("**2. ORB Feature Keypoints**"); v2.image(results["keypoint_image"], width="stretch")
+    v3.markdown("**3. Edge Heatmap Overlay**");  v3.image(results["heatmap_image"],  width="stretch")
 
     st.divider()
     with st.expander("📋 Detailed Forensic Findings", expanded=True):
@@ -156,7 +156,7 @@ def main():
                 [{"ID": r[0], "Brand": r[1], "Verdict": r[2], "Score": f"{r[3]}%",
                   "Threat": r[4], "EdgeDensity": r[5], "Keypoints": r[6],
                   "Source": r[7], "Timestamp": r[8]} for r in rows],
-                use_container_width=True)
+                use_container_width=True)  # dataframe supports use_container_width
         else:
             st.info("No logs yet.")
         return

@@ -5,8 +5,9 @@ from pathlib import Path
 # Add project root and src directories to sys.path
 ROOT_DIR = Path(__file__).resolve().parent
 SRC_DIR = ROOT_DIR / "src"
+DB_DIR = ROOT_DIR / "database"
 
-for p in [ROOT_DIR, SRC_DIR]:
+for p in [ROOT_DIR, SRC_DIR, DB_DIR]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
@@ -16,9 +17,10 @@ import tempfile
 
 from brandshield_ai.detector_engine import BrandShieldDetector
 from brandshield_ai.forensic_report import ForensicReportGenerator
+from database.db import BrandShieldDB
 
 st.set_page_config(
-    page_title="BrandShield-AI | Fake Logo Detection",
+    page_title="BrandShield-AI | Counterfeit Detection & Brand Protection",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,66 +30,121 @@ def main():
     st.sidebar.title("🛡️ BrandShield-AI")
     st.sidebar.caption("Enterprise Counterfeit Logo & Brand Protection System")
     
-    nav = st.sidebar.radio("Navigation", ["Logo Inspection Portal", "Brand Threat Database", "System Architecture"])
-    
+    db = BrandShieldDB()
     detector = BrandShieldDetector()
     
-    if nav == "Brand Threat Database":
-        st.title("📊 Global Brand Threat Database")
-        st.info("Monitored Brand Assets & Counterfeit Incident History")
-        
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Monitored Brands", "125+")
-        col_b.metric("Counterfeits Blocked Today", "43")
-        col_c.metric("Detection Precision", "98.4%")
-        
-        st.subheader("Recent Counterfeit Detection Alerts")
-        st.table([
-            {"Timestamp": "2026-07-23 16:45", "Brand": "Nike", "Verdict": "COUNTERFEIT (32%)", "Risk": "HIGH", "Action": "Flagged for Legal"},
-            {"Timestamp": "2026-07-23 16:20", "Brand": "Gucci", "Verdict": "COUNTERFEIT (18%)", "Risk": "HIGH", "Action": "Customs Seizure Notice"},
-            {"Timestamp": "2026-07-23 15:55", "Brand": "Apple", "Verdict": "AUTHENTIC (96%)", "Risk": "LOW", "Action": "Verified Pass"},
-            {"Timestamp": "2026-07-23 15:10", "Brand": "Rolex", "Verdict": "ALTERED (54%)", "Risk": "MEDIUM", "Action": "Manual Audit"},
-        ])
+    nav = st.sidebar.radio("Navigation", [
+        "🛡️ Live Inspection Portal", 
+        "🌐 Web URL Scanner",
+        "📊 SQLite Audit Logs & Analytics", 
+        "🏗️ System Architecture"
+    ])
+
+    # 1. SQLite Audit Logs & Analytics
+    if nav == "📊 SQLite Audit Logs & Analytics":
+        st.title("📊 SQLite Audit Logs & Brand Analytics")
+        st.divider()
+
+        stats = db.fetch_stats()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Inspections Logged", stats["total_inspections"])
+        c2.metric("Counterfeits Blocked", stats["counterfeits_blocked"])
+        c3.metric("Authentics Verified", stats["authentics_verified"])
+
+        st.divider()
+        st.subheader("📜 Recent Inspection History (SQLite Database)")
+        history = db.fetch_inspections(limit=50)
+
+        if history:
+            formatted_data = []
+            for row in history:
+                formatted_data.append({
+                    "ID": row[0],
+                    "Brand": row[1],
+                    "Verdict": row[2],
+                    "Score (%)": f"{row[3]}%",
+                    "Threat Level": row[4],
+                    "Edge Density": row[5],
+                    "Keypoints": row[6],
+                    "Source": row[7],
+                    "Timestamp": row[8]
+                })
+            st.dataframe(formatted_data, use_container_width=True)
+        else:
+            st.info("No inspection logs recorded in SQLite database yet.")
         return
 
-    if nav == "System Architecture":
-        st.title("🏗️ BrandShield-AI Architecture & Inspection Flow")
+    # 2. System Architecture
+    if nav == "🏗️ System Architecture":
+        st.title("🏗️ BrandShield-AI Architecture & Multi-Stage Pipeline")
         st.markdown("""
-        ### Multi-Stage Forensic Inspection Pipeline:
-        1. **Dual PDF & Image Ingestion**: Reads PNG/JPG logo files across high-resolution inspect channels.
-        2. **OpenCV Structural Analysis**: Calculates Canny Edge Density, Contour Symmetries, and ORB Keypoints.
-        3. **Deep Feature Feature Extraction**: MobileNetV2 Deep Learning transfer heuristics.
+        ### Multi-Stage Forensic Inspection Engine:
+        1. **Dual Ingestion Engine**: Accepts high-res local image uploads (PNG/JPG) OR live web product image URLs.
+        2. **OpenCV Structural Analysis**: Calculates Canny Edge Density, Contour Symmetries, and 500 ORB feature keypoint vectors.
+        3. **Deep Feature Extraction**: MobileNetV2 Deep Learning transfer heuristics.
         4. **Google Gemini 1.5 Pro Multimodal Vision**: Inspects typography alignment, trademark gradient anomalies, and geometry.
-        5. **ReportLab Forensic Certification**: Generates downloadable PDF verification certificates for legal and compliance teams.
+        5. **SQLite Persistence**: Stores all inspection alerts and brand threat trends in `database/brandshield.db`.
+        6. **ReportLab Forensic Certification**: Generates downloadable PDF verification certificates for legal compliance teams.
         """)
         return
 
-    # Main Portal
+    # 3. Main Live Inspection Portal (File Upload or Web URL)
     st.title("🛡️ BrandShield-AI")
     st.subheader("AI-Powered Counterfeit Logo Detection & Forensic Verification")
     st.divider()
 
-    left_col, right_col = st.columns([1, 2])
-    
-    with left_col:
-        st.markdown("### 📤 Upload Logo Image")
-        uploaded_file = st.file_uploader("Choose Logo Image (PNG / JPG / JPEG)", type=["png", "jpg", "jpeg"])
-        
-        target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS)
-        
-        analyze_btn = st.button("🔍 Run Forensic Inspection", use_container_width=True)
+    image_to_analyze = None
+    source_type = "File Upload"
 
-    if analyze_btn:
-        if uploaded_file is None:
-            st.error("Please upload a logo image to inspect.")
-            return
-
-        image = Image.open(uploaded_file)
+    if nav == "🌐 Web URL Scanner":
+        st.markdown("### 🌐 Inspect Image from Web URL")
+        url_input = st.text_input("Paste Live Image URL (e.g. e-commerce product image)", placeholder="https://example.com/logo.jpg")
+        target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="url_brand")
+        analyze_btn = st.button("🌐 Scan Image URL", use_container_width=True)
         
+        if analyze_btn:
+            if not url_input.strip():
+                st.error("Please enter a valid Image URL.")
+                return
+            try:
+                with st.spinner("Fetching image from Web URL..."):
+                    image_to_analyze = detector.load_image_from_url(url_input)
+                    source_type = "Web URL Scan"
+            except Exception as e:
+                st.error(f"Failed to fetch image from URL: {e}")
+                return
+    else:
+        left_col, right_col = st.columns([1, 2])
+        with left_col:
+            st.markdown("### 📤 Upload Logo File")
+            uploaded_file = st.file_uploader("Choose Logo Image (PNG / JPG / JPEG)", type=["png", "jpg", "jpeg"])
+            target_brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="file_brand")
+            analyze_btn = st.button("🔍 Run Forensic Inspection", use_container_width=True)
+
+            if analyze_btn:
+                if uploaded_file is None:
+                    st.error("Please upload a logo image to inspect.")
+                    return
+                image_to_analyze = Image.open(uploaded_file)
+                source_type = "File Upload"
+
+    if image_to_analyze:
         with st.spinner(f"Running OpenCV Structural Inspection & Querying Gemini Vision for {target_brand}..."):
-            results = detector.analyze_logo(image, target_brand)
+            results = detector.analyze_logo(image_to_analyze, target_brand)
+            
+            # Save to SQLite Database
+            db.save_inspection(
+                brand=target_brand,
+                verdict=results["verdict_label"],
+                score=results["authenticity_score"],
+                threat_level=results["threat_level"],
+                edge_density=results["edge_density"],
+                keypoints_count=results["keypoints_count"],
+                source_type=source_type
+            )
+            
             st.session_state["results"] = results
-            st.session_state["original_image"] = image
+            st.session_state["original_image"] = image_to_analyze
 
     if st.session_state.get("results"):
         results = st.session_state["results"]
@@ -121,11 +178,11 @@ def main():
         st.divider()
 
         # Visual Comparison Section
-        st.subheader("🔬 Visual Forensic Inspection")
+        st.subheader("🔬 Visual Forensic Inspection Studio")
         v1, v2, v3 = st.columns(3)
         
         with v1:
-            st.markdown("#### 1. Uploaded Logo")
+            st.markdown("#### 1. Input Logo")
             st.image(orig_img, use_container_width=True)
             
         with v2:

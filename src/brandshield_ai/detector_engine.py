@@ -1,7 +1,9 @@
 import os
 import cv2
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image
+import requests
+import io
 import google.generativeai as genai
 import json
 
@@ -28,11 +30,20 @@ class BrandShieldDetector:
             except Exception:
                 pass
 
+    @staticmethod
+    def load_image_from_url(url: str) -> Image.Image:
+        """
+        Fetches an image from a live Web URL (e.g. e-commerce product image).
+        """
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        return Image.open(io.BytesIO(res.content)).convert("RGB")
+
     def analyze_logo(self, image_pil: Image.Image, target_brand: str = "Nike") -> dict:
         """
         Runs complete multi-stage forensic analysis on uploaded logo image.
         """
-        # Convert PIL to OpenCV BGR format
         img_np = np.array(image_pil.convert("RGB"))
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
         
@@ -57,8 +68,7 @@ class BrandShieldDetector:
         edge_density = float(np.mean(edges > 0))
         num_keypoints = len(keypoints) if keypoints is not None else 0
         
-        # Calculate Base Statistical Authenticity Score (0 - 100)
-        # Counterfeit logos often have noisy edges, distorted keypoints, or irregular aspect ratios
+        # Base Score (0 - 100)
         base_score = 88.5
         if edge_density > 0.35 or edge_density < 0.02:
             base_score -= 25.0
@@ -104,7 +114,6 @@ class BrandShieldDetector:
 
     def _run_gemini_vision_audit(self, image_pil: Image.Image, target_brand: str) -> dict:
         try:
-            # Model selection list
             candidate_models = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "gemini-1.5-flash-latest"]
             
             prompt = f"""

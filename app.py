@@ -2,20 +2,23 @@ import sys
 import os
 from pathlib import Path
 
+# ── Path setup (must happen before ANY local imports) ──────────────────────────
 ROOT_DIR = Path(__file__).resolve().parent
 SRC_DIR  = ROOT_DIR / "src"
 DB_DIR   = ROOT_DIR / "database"
 
-for p in [ROOT_DIR, SRC_DIR, DB_DIR]:
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+for p in [str(ROOT_DIR), str(SRC_DIR), str(DB_DIR)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
+# ── Standard imports ────────────────────────────────────────────────────────────
 import streamlit as st
 from PIL import Image
 
-from brandshield_ai.detector_engine import BrandShieldDetector
-from brandshield_ai.forensic_report import ForensicReportGenerator
-from database.db import BrandShieldDB
+# ── Local flat imports (no nested package — avoids Streamlit Cloud KeyError) ───
+from detector_engine import BrandShieldDetector
+from forensic_report import ForensicReportGenerator
+from db              import BrandShieldDB
 
 st.set_page_config(
     page_title="BrandShield-AI | Counterfeit Detection & Brand Protection",
@@ -25,9 +28,9 @@ st.set_page_config(
 )
 
 
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 # Render results — always reads from session_state
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 def render_results():
     results  = st.session_state.get("bs_results")
     orig_img = st.session_state.get("bs_image")
@@ -57,11 +60,10 @@ def render_results():
 
     st.divider()
     st.subheader("🔬 Visual Forensic Inspection Studio")
-
     v1, v2, v3 = st.columns(3)
-    v1.markdown("**1. Input Logo**");           v1.image(orig_img,                    use_container_width=True)
-    v2.markdown("**2. ORB Feature Keypoints**"); v2.image(results["keypoint_image"],   use_container_width=True)
-    v3.markdown("**3. Edge Heatmap Overlay**");  v3.image(results["heatmap_image"],    use_container_width=True)
+    v1.markdown("**1. Input Logo**");            v1.image(orig_img,                  use_container_width=True)
+    v2.markdown("**2. ORB Feature Keypoints**"); v2.image(results["keypoint_image"], use_container_width=True)
+    v3.markdown("**3. Edge Heatmap Overlay**");  v3.image(results["heatmap_image"],  use_container_width=True)
 
     st.divider()
 
@@ -74,37 +76,36 @@ def render_results():
 
     pdf_bytes = ForensicReportGenerator.generate_pdf_bytes(results)
     st.download_button(
-        label    = "📥 Download Forensic Verification Certificate (PDF)",
-        data     = pdf_bytes,
-        file_name= f"BrandShield_{brand}.pdf",
-        mime     = "application/pdf",
+        label     = "📥 Download Forensic Verification Certificate (PDF)",
+        data      = pdf_bytes,
+        file_name = f"BrandShield_{brand}.pdf",
+        mime      = "application/pdf",
     )
 
 
-# ─────────────────────────────────────────────────────────
-# Core analysis helper — saves to DB + session_state
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# Core analysis — runs detector, saves to DB + session_state
+# ──────────────────────────────────────────────────────────────────────────────
 def do_analysis(image: Image.Image, brand: str, source: str,
                 detector: BrandShieldDetector, db: BrandShieldDB):
     results = detector.analyze_logo(image, brand)
     db.save_inspection(
-        brand          = brand,
-        verdict        = results["verdict_label"],
-        score          = results["authenticity_score"],
-        threat_level   = results["threat_level"],
-        edge_density   = results["edge_density"],
-        keypoints_count= results["keypoints_count"],
-        source_type    = source,
+        brand           = brand,
+        verdict         = results["verdict_label"],
+        score           = results["authenticity_score"],
+        threat_level    = results["threat_level"],
+        edge_density    = results["edge_density"],
+        keypoints_count = results["keypoints_count"],
+        source_type     = source,
     )
     st.session_state["bs_results"] = results
     st.session_state["bs_image"]   = image
 
 
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 # Main
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 def main():
-    # Init session keys
     st.session_state.setdefault("bs_results",    None)
     st.session_state.setdefault("bs_image",      None)
     st.session_state.setdefault("bs_active_tab", None)
@@ -112,7 +113,7 @@ def main():
     db       = BrandShieldDB()
     detector = BrandShieldDetector()
 
-    # ── Sidebar ──────────────────────────────────────────
+    # ── Sidebar ───────────────────────────────────────────────────────────────
     st.sidebar.title("🛡️ BrandShield-AI")
     st.sidebar.caption("Enterprise Counterfeit Logo & Brand Protection System")
     if detector.gemini_available:
@@ -128,15 +129,15 @@ def main():
         "🏗️ System Architecture",
     ])
 
-    # Clear results whenever tab changes
+    # Clear results when tab changes
     if st.session_state["bs_active_tab"] != nav:
         st.session_state["bs_results"]    = None
         st.session_state["bs_image"]      = None
         st.session_state["bs_active_tab"] = nav
 
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # TAB: Audit Logs
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     if nav == "📊 SQLite Audit Logs":
         st.title("📊 SQLite Audit Logs & Brand Analytics")
         st.divider()
@@ -150,18 +151,18 @@ def main():
         rows = db.fetch_inspections(limit=50)
         if rows:
             st.dataframe(
-                [{"ID":r[0],"Brand":r[1],"Verdict":r[2],"Score":f"{r[3]}%",
-                  "Threat":r[4],"EdgeDensity":r[5],"Keypoints":r[6],
-                  "Source":r[7],"Timestamp":r[8]} for r in rows],
+                [{"ID": r[0], "Brand": r[1], "Verdict": r[2], "Score": f"{r[3]}%",
+                  "Threat": r[4], "EdgeDensity": r[5], "Keypoints": r[6],
+                  "Source": r[7], "Timestamp": r[8]} for r in rows],
                 use_container_width=True,
             )
         else:
             st.info("No logs yet — run a scan first.")
         return
 
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # TAB: Architecture
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     if nav == "🏗️ System Architecture":
         st.title("🏗️ BrandShield-AI — System Architecture")
         st.markdown("""
@@ -174,35 +175,31 @@ def main():
         """)
         return
 
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # TAB: Webcam Scanner
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     if nav == "📷 Live Webcam Scanner":
         st.title("📷 Live Webcam Logo Scanner")
         st.divider()
-        brand  = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="cam_brand")
-        photo  = st.camera_input("📸 Take a photo of the product logo")
-
+        brand = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="cam_brand")
+        photo = st.camera_input("📸 Take a photo of the product logo")
         if photo:
             image = Image.open(photo)
             with st.spinner(f"Inspecting for **{brand}**…"):
                 do_analysis(image, brand, "Webcam Scan", detector, db)
-            st.rerun()                  # ← clean render from session_state
-
+            st.rerun()
         render_results()
         return
 
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # TAB: Web URL Scanner
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     if nav == "🌐 Web URL Scanner":
         st.title("🌐 Web URL Logo Scanner")
         st.divider()
         brand     = st.selectbox("Select Target Brand", detector.SUPPORTED_BRANDS, key="url_brand")
-        url_input = st.text_input(
-            "Paste a direct image URL (PNG / JPG)",
-            placeholder="https://example.com/logo.png",
-        )
+        url_input = st.text_input("Paste image URL (PNG / JPG)",
+                                  placeholder="https://example.com/logo.png")
         if st.button("🌐 Scan Image from URL", key="url_btn"):
             if not url_input.strip():
                 st.error("Please paste a valid image URL first.")
@@ -215,14 +212,13 @@ def main():
                         st.stop()
                 with st.spinner(f"Inspecting for **{brand}**…"):
                     do_analysis(image, brand, "Web URL Scan", detector, db)
-                st.rerun()              # ← clean render from session_state
-
+                st.rerun()
         render_results()
         return
 
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # TAB: File Upload (DEFAULT)
-    # ════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     st.title("🛡️ BrandShield-AI")
     st.subheader("AI-Powered Counterfeit Logo Detection & Forensic Verification")
     st.divider()
@@ -236,15 +232,14 @@ def main():
 
     if st.button("🔍 Run Forensic Inspection", key="inspect_btn"):
         if uploaded_file is None:
-            st.error("⚠️ Upload an image first, then click the button.")
+            st.error("⚠️ Upload a logo image first, then click the button.")
         else:
             with st.spinner(f"Inspecting logo for **{brand}** — please wait…"):
                 image = Image.open(uploaded_file)
                 do_analysis(image, brand, "File Upload", detector, db)
-            st.rerun()                  # ← KEY FIX: forces clean render from session_state
+            st.rerun()   # ← forces clean render from session_state on next run
 
-    # Always render from session_state — persists across all reruns
-    render_results()
+    render_results()     # ← always renders from session_state
 
 
 if __name__ == "__main__":

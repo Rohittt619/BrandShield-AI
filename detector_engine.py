@@ -23,6 +23,7 @@ class BrandShieldDetector:
         self.gemini_available = False
         self._client = None
         self._init_error = None
+        self._last_error = None
         self._api_key = api_key
 
         if api_key:
@@ -123,7 +124,7 @@ Return ONLY JSON:
   "forensic_reasons": ["Brand verified", "Typography correct"]
 }}
 """
-            for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
+            for model_name in ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]:
                 try:
                     resp = self._client.models.generate_content(
                         model=model_name,
@@ -134,10 +135,15 @@ Return ONLY JSON:
                     )
                     if resp.text and resp.text.strip():
                         return json.loads(resp.text)
-                except Exception:
+                except Exception as e:
+                    err_str = str(e)
+                    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                        self._last_error = "Gemini API quota exhausted — free tier limit reached. Try again later or use a different API key."
+                    else:
+                        self._last_error = f"{model_name}: {type(e).__name__}: {err_str[:100]}"
                     continue
-        except Exception:
-            pass
+        except Exception as e:
+            self._last_error = f"Setup error: {e}"
         return None
 
     def analyze_logo(self, image_pil: Image.Image, target_brand: str = "Nike") -> dict:
@@ -167,6 +173,8 @@ Return ONLY JSON:
                 f"ORB keypoints: {cv['keypoints_count']} vectors",
                 f"Contours: {cv['num_contours']} shapes",
             ]
+            if self._last_error:
+                reasons.insert(0, f"⚠️ {self._last_error}")
 
         return {
             "target_brand":       target_brand,

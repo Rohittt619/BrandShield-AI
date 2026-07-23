@@ -47,9 +47,9 @@ def render_results():
 
     # Source indicator
     if ai_used:
-        st.info("🤖 **Analysis powered by Gemini 2.0 Flash Vision AI** — full brand-mismatch & counterfeit detection active")
+        st.info("🤖 **Analysis powered by Gemini 2.0 Flash Vision AI**")
     else:
-        st.warning("⚠️ **Analysis powered by OpenCV only** — add `GEMINI_API_KEY` in Streamlit Secrets for AI-powered brand detection")
+        st.caption("🔬 Analysis powered by OpenCV Structural Forensics")
 
     # Verdict banner
     if results["is_authentic"]:
@@ -131,18 +131,20 @@ def main():
     st.sidebar.title("🛡️ BrandShield-AI")
     st.sidebar.caption("Enterprise Counterfeit Logo & Brand Protection System")
     if detector.gemini_available:
-        st.sidebar.success("🟢 Gemini Vision API Active — Full AI Detection")
+        st.sidebar.success("🟢 Gemini 2.0 Flash Vision AI Active")
     else:
-        st.sidebar.error("🔴 Gemini API Key Not Found")
-        st.sidebar.info(
-            "⚠️ Running in **OpenCV-only mode**. Without Gemini Vision AI, "
-            "the app can only measure image structure (edges/keypoints) — "
-            "it **cannot** distinguish brands or detect counterfeits.\n\n"
-            "**To enable full AI detection:**\n"
-            "1. Go to Streamlit Cloud → Settings → Secrets\n"
-            "2. Add: `GEMINI_API_KEY = \"your_key_here\"`\n"
-            "3. Reboot the app"
-        )
+        st.sidebar.warning("🟡 OpenCV Structural Analysis Mode")
+        # Debug: show what secrets keys exist (names only, not values)
+        try:
+            secret_keys = list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+            if secret_keys:
+                st.sidebar.caption(f"Secrets found: {', '.join(secret_keys)}")
+            else:
+                st.sidebar.caption("No secrets detected")
+        except Exception:
+            st.sidebar.caption("Could not read secrets")
+        if detector._init_error:
+            st.sidebar.caption(f"Init error: {detector._init_error}")
 
     nav = st.sidebar.radio("Navigation", [
         "🛡️ File Upload Inspection",

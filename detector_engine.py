@@ -35,20 +35,34 @@ class BrandShieldDetector:
                 self._init_error = f"Client init failed: {type(e).__name__}: {e}"
 
     def test_api_key(self) -> str:
-        """Test if the API key actually works by making a simple call."""
+        """Test all Gemini models to find one with available quota."""
         if not self._api_key:
             return "❌ No API key provided"
         if not self._client:
             return f"❌ Client not initialized: {self._init_error}"
-        try:
-            from google.genai import types
-            resp = self._client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=["Say hello in one word"],
-            )
-            return f"✅ API Key works! Response: {resp.text[:50]}"
-        except Exception as e:
-            return f"❌ API call failed: {type(e).__name__}: {e}"
+
+        models_to_try = [
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-pro",
+        ]
+        results = []
+        for model in models_to_try:
+            try:
+                resp = self._client.models.generate_content(
+                    model=model,
+                    contents=["Say hello in one word"],
+                )
+                return f"✅ **{model}** works! Response: {resp.text[:50]}"
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    results.append(f"⚠️ {model}: quota exhausted")
+                else:
+                    results.append(f"❌ {model}: {type(e).__name__}")
+        return "All models quota exhausted:\\n" + "\\n".join(results)
 
     @staticmethod
     def load_image_from_url(url: str) -> Image.Image:
@@ -124,7 +138,7 @@ Return ONLY JSON:
   "forensic_reasons": ["Brand verified", "Typography correct"]
 }}
 """
-            for model_name in ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]:
+            for model_name in ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]:
                 try:
                     resp = self._client.models.generate_content(
                         model=model_name,

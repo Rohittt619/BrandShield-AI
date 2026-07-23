@@ -10,8 +10,8 @@ import requests
 class BrandShieldDetector:
     """
     Multi-Stage Forensic Logo Detector.
-    Stage 1: OpenCV Structural Forensics (image quality metrics)
-    Stage 2: Google Gemini 2.0 Flash Vision AI (brand identification + counterfeit detection)
+    Stage 1: OpenCV Structural Forensics (always runs)
+    Stage 2: Google Gemini 2.0 Flash Vision AI (when API key works)
     """
 
     SUPPORTED_BRANDS = [
@@ -20,22 +20,34 @@ class BrandShieldDetector:
     ]
 
     def __init__(self, api_key: str = None):
-        """
-        Initialize detector. Pass api_key directly from app.py
-        so we don't have to guess where to find it.
-        """
         self.gemini_available = False
         self._client = None
         self._init_error = None
+        self._api_key = api_key
 
         if api_key:
             try:
                 from google import genai
                 self._client = genai.Client(api_key=str(api_key).strip())
-                # Quick validation: list models to verify key works
                 self.gemini_available = True
             except Exception as e:
-                self._init_error = str(e)
+                self._init_error = f"Client init failed: {type(e).__name__}: {e}"
+
+    def test_api_key(self) -> str:
+        """Test if the API key actually works by making a simple call."""
+        if not self._api_key:
+            return "❌ No API key provided"
+        if not self._client:
+            return f"❌ Client not initialized: {self._init_error}"
+        try:
+            from google.genai import types
+            resp = self._client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=["Say hello in one word"],
+            )
+            return f"✅ API Key works! Response: {resp.text[:50]}"
+        except Exception as e:
+            return f"❌ API call failed: {type(e).__name__}: {e}"
 
     @staticmethod
     def load_image_from_url(url: str) -> Image.Image:
@@ -44,12 +56,8 @@ class BrandShieldDetector:
         res.raise_for_status()
         return Image.open(io.BytesIO(res.content)).convert("RGB")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # STAGE 1: OpenCV Structural Forensics
-    # ══════════════════════════════════════════════════════════════════════
     def _opencv_forensics(self, img_bgr: np.ndarray) -> dict:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blur, 50, 150)
         edge_density = float(np.mean(edges > 0))
@@ -66,9 +74,7 @@ class BrandShieldDetector:
         symmetry = 100.0 - float(np.mean(diff) / 2.55)
 
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        num_contours = len(contours)
 
-        # Visualization
         kp_img  = cv2.drawKeypoints(img_bgr, keypoints, None, color=(0, 255, 0), flags=0)
         heatmap = cv2.applyColorMap(edges, cv2.COLORMAP_JET)
 
@@ -77,14 +83,11 @@ class BrandShieldDetector:
             "keypoints_count": num_keypoints,
             "sharpness_score": round(sharpness, 1),
             "symmetry_score":  round(symmetry, 1),
-            "num_contours":    num_contours,
+            "num_contours":    len(contours),
             "kp_image_rgb":    cv2.cvtColor(kp_img,  cv2.COLOR_BGR2RGB),
             "heatmap_rgb":     cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB),
         }
 
-    # ══════════════════════════════════════════════════════════════════════
-    # STAGE 2: Gemini 2.0 Flash Vision AI
-    # ══════════════════════════════════════════════════════════════════════
     def _run_gemini_vision(self, image_pil: Image.Image, target_brand: str) -> dict | None:
         if not self.gemini_available or not self._client:
             return None
@@ -99,36 +102,25 @@ class BrandShieldDetector:
 Analyze this logo image. The user claims it belongs to: "{target_brand}".
 
 STEP 1 — BRAND IDENTIFICATION:
-What brand does this logo ACTUALLY represent? Look at the shape, text, and design.
+What brand does this logo ACTUALLY represent?
 
 STEP 2 — BRAND MATCH:
 Does the detected brand match "{target_brand}"?
-- If NO (e.g., user selected Nike but image shows Adidas) → COUNTERFEIT, score=5, threat="CRITICAL"
+- If NO → COUNTERFEIT, score=5, threat="CRITICAL"
 - If YES → proceed to Step 3
 
-STEP 3 — AUTHENTICITY CHECK (only if brand matches):
-Examine for counterfeit indicators:
-- Typography: wrong font, spacing, weight
-- Colors: off-brand colors, wrong gradients
-- Geometry: asymmetric, distorted, stretched
-- Quality: pixelated, blurry, artifacts
-- Trademark: missing ™ or ® where expected
+STEP 3 — AUTHENTICITY CHECK:
+Check typography, colors, geometry, quality, trademark symbols.
+Score 80-99 for authentic. Score 20-50 for suspected counterfeit. Score 1-10 for obvious fake.
 
-Score 80-99 for authentic logos.
-Score 20-50 for suspected counterfeits.
-Score 1-10 for obvious fakes or wrong brand.
-
-Return ONLY this JSON:
+Return ONLY JSON:
 {{
-  "detected_brand": "the actual brand in the image",
+  "detected_brand": "Nike",
   "matches_target": true,
   "authenticity_score": 95.0,
   "verdict": "AUTHENTIC",
   "threat_level": "LOW",
-  "forensic_reasons": [
-    "Brand identity: Nike swoosh confirmed",
-    "Typography: consistent with official brand"
-  ]
+  "forensic_reasons": ["Brand verified", "Typography correct"]
 }}
 """
             for model_name in ["gemini-2.0-flash", "gemini-1.5-flash"]:
@@ -148,35 +140,26 @@ Return ONLY this JSON:
             pass
         return None
 
-    # ══════════════════════════════════════════════════════════════════════
-    # PUBLIC API
-    # ══════════════════════════════════════════════════════════════════════
     def analyze_logo(self, image_pil: Image.Image, target_brand: str = "Nike") -> dict:
         img_np  = np.array(image_pil.convert("RGB"))
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
 
-        # Stage 1: OpenCV (always)
         cv = self._opencv_forensics(img_bgr)
-
-        # Stage 2: Gemini Vision (if available)
         ai = self._run_gemini_vision(image_pil, target_brand)
 
         ai_used = False
         if ai and isinstance(ai, dict) and "verdict" in ai:
-            ai_used        = True
-            final_score    = float(ai.get("authenticity_score", 50.0))
-            verdict_raw    = ai.get("verdict", "").upper()
-            is_authentic   = verdict_raw == "AUTHENTIC"
-            threat_level   = ai.get("threat_level", "LOW" if is_authentic else "HIGH")
-            detected_brand = ai.get("detected_brand", "Unknown")
-            reasons        = ai.get("forensic_reasons", [])
-            reasons.insert(0, f"Gemini Vision detected brand: **{detected_brand}**")
+            ai_used      = True
+            final_score  = float(ai.get("authenticity_score", 50.0))
+            is_authentic = ai.get("verdict", "").upper() == "AUTHENTIC"
+            threat_level = ai.get("threat_level", "LOW" if is_authentic else "HIGH")
+            detected     = ai.get("detected_brand", "Unknown")
+            reasons      = ai.get("forensic_reasons", [])
+            reasons.insert(0, f"Gemini Vision detected brand: **{detected}**")
         else:
-            # OpenCV-only fallback: report structural metrics honestly
-            final_score  = 0.0  # will not assign a fake authenticity score
-            is_authentic = None  # unknown
+            final_score  = 0.0
+            is_authentic = None
             threat_level = "UNKNOWN"
-            detected_brand = None
             reasons = [
                 f"Sharpness: {cv['sharpness_score']} (Laplacian variance)",
                 f"Symmetry: {cv['symmetry_score']}% (horizontal flip)",

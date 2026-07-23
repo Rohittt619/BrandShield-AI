@@ -124,9 +124,22 @@ def main():
     else:
         st.sidebar.warning("🟡 OpenCV Structural Analysis Mode")
         if api_key:
-            st.sidebar.caption(f"Key found ({len(api_key)} chars) — init error: {detector._init_error}")
+            st.sidebar.caption(f"Key found ({len(api_key)} chars, starts with '{api_key[:4]}...')")
+            if detector._init_error:
+                st.sidebar.error(f"Init error: {detector._init_error}")
         else:
-            st.sidebar.caption("No API key in env or st.secrets")
+            st.sidebar.caption("No API key found")
+
+    # Test API Key button — shows exact success/failure
+    with st.sidebar.expander("🔧 API Key Diagnostics"):
+        if api_key:
+            st.code(f"Key: {api_key[:6]}...{api_key[-4:]}\nLength: {len(api_key)} chars\nClient OK: {detector.gemini_available}")
+        else:
+            st.write("No key detected in `st.secrets` or env vars")
+        if st.button("🧪 Test API Key Now", key="test_api"):
+            with st.spinner("Testing connection to Gemini..."):
+                result = detector.test_api_key()
+            st.write(result)
 
     nav = st.sidebar.radio("Navigation", [
         "🛡️ File Upload Inspection",

@@ -41,24 +41,36 @@ def render_results():
     score   = results["authenticity_score"]
     verdict = results["verdict_label"]
     threat  = results["threat_level"]
+    ai_used = results.get("ai_used", False)
 
     st.divider()
 
+    # Source indicator
+    if ai_used:
+        st.info("🤖 **Analysis powered by Gemini 2.0 Flash Vision AI** — full brand-mismatch & counterfeit detection active")
+    else:
+        st.warning("⚠️ **Analysis powered by OpenCV only** — add `GEMINI_API_KEY` in Streamlit Secrets for AI-powered brand detection")
+
+    # Verdict banner
     if results["is_authentic"]:
         st.success(f"✅  **AUTHENTIC** — matches **{brand}** | Score: **{score}%** | Threat: **{threat}**")
     else:
         st.error(f"❌  **COUNTERFEIT / ALTERED** — high-risk logo for **{brand}** | Score: **{score}%** | Threat: **{threat}**")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # Metrics row
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        st.metric("Authenticity Score", f"{score}%")
+        st.metric("Authenticity", f"{score}%")
         st.progress(int(min(score, 100)))
     c2.metric("Verdict",       verdict)
     c3.metric("Threat Level",  threat)
-    c4.metric("Edge Density",  str(results["edge_density"]))
-    c5.metric("ORB Keypoints", str(results["keypoints_count"]))
+    c4.metric("Sharpness",     f"{results.get('sharpness_score', 'N/A')}")
+    c5.metric("Symmetry",      f"{results.get('symmetry_score', 'N/A')}%")
+    c6.metric("ORB Keypoints", str(results["keypoints_count"]))
 
     st.divider()
+
+    # Visual forensic studio
     st.subheader("🔬 Visual Forensic Inspection Studio")
     v1, v2, v3 = st.columns(3)
     v1.markdown("**1. Input Logo**");            v1.image(orig_img,                  use_container_width=True)
@@ -67,6 +79,7 @@ def render_results():
 
     st.divider()
 
+    # Forensic findings
     with st.expander("📋 Detailed Forensic Findings", expanded=True):
         st.markdown("#### Key Forensic Observations:")
         for r in results["forensic_reasons"]:
@@ -74,6 +87,7 @@ def render_results():
 
     st.divider()
 
+    # PDF download
     pdf_bytes = ForensicReportGenerator.generate_pdf_bytes(results)
     st.download_button(
         label     = "📥 Download Forensic Verification Certificate (PDF)",
@@ -117,9 +131,18 @@ def main():
     st.sidebar.title("🛡️ BrandShield-AI")
     st.sidebar.caption("Enterprise Counterfeit Logo & Brand Protection System")
     if detector.gemini_available:
-        st.sidebar.success("🟢 Gemini Vision API Active")
+        st.sidebar.success("🟢 Gemini Vision API Active — Full AI Detection")
     else:
-        st.sidebar.warning("🟡 OpenCV Structural Mode (no API key)")
+        st.sidebar.error("🔴 Gemini API Key Not Found")
+        st.sidebar.info(
+            "⚠️ Running in **OpenCV-only mode**. Without Gemini Vision AI, "
+            "the app can only measure image structure (edges/keypoints) — "
+            "it **cannot** distinguish brands or detect counterfeits.\n\n"
+            "**To enable full AI detection:**\n"
+            "1. Go to Streamlit Cloud → Settings → Secrets\n"
+            "2. Add: `GEMINI_API_KEY = \"your_key_here\"`\n"
+            "3. Reboot the app"
+        )
 
     nav = st.sidebar.radio("Navigation", [
         "🛡️ File Upload Inspection",
